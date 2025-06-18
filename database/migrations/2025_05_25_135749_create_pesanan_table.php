@@ -11,7 +11,7 @@ return new class extends Migration
 {
     Schema::create('pesanan', function (Blueprint $table) {
         $table->id();
-        $table->foreignId('pelanggan_id')->constrained()->onDelete('cascade');
+        $table->foreignId('user_id')->constrained()->onDelete('cascade');
         $table->string('rute');
         $table->decimal('harga', 10, 2);
         $table->string('maskapai');
