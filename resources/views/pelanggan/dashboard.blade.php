@@ -84,9 +84,9 @@
                     </div>
                 </div>
                 <div class="mt-4">
-                    <a href="{{ route('pelanggan.pesanan.create') }}" class="text-purple-600 text-sm font-medium hover:text-purple-800 transition-colors">
+                    <a href="{{ route('pelanggan.tiket.index') }}" class="text-purple-600 text-sm font-medium hover:text-purple-800 transition-colors">
                         <i class="fas fa-plus mr-1"></i>
-                        Buat Pesanan
+                        Pesan Tiket
                     </a>
                 </div>
             </div>
@@ -177,10 +177,10 @@
                                     <i class="fas fa-shopping-cart text-gray-400 text-2xl"></i>
                                 </div>
                                 <p class="text-gray-500 mb-4">Belum ada pesanan</p>
-                                <a href="{{ route('pelanggan.pesanan.create') }}" 
-                                   class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                                <a href="{{ route('pelanggan.tiket.index') }}" 
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
                                     <i class="fas fa-plus mr-2"></i>
-                                    Buat Pesanan Pertama
+                                    Cari Tiket Sekarang
                                 </a>
                             </div>
                         @endif
@@ -230,10 +230,10 @@
                             <i class="fas fa-list mr-3"></i>
                             Lihat Semua Pesanan
                         </a>
-                        <a href="{{ route('pelanggan.pesanan.create') }}" 
-                           class="flex items-center w-full py-3 px-4 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors duration-200">
+                        <a href="{{ route('pelanggan.tiket.index') }}" 
+                            class="flex items-center w-full py-3 px-4 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors duration-200">
                             <i class="fas fa-plus-circle mr-3"></i>
-                            Buat Pesanan Baru
+                            Cari & Pesan Tiket
                         </a>
                         <!--  -->
                     </div>

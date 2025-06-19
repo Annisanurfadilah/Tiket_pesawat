@@ -10,8 +10,6 @@ class Tiket extends Model
 {
     use HasFactory;
 
-    protected $table = 'tiket'; // atau 'tiket' sesuai dengan nama tabel Anda
-
     protected $fillable = [
         'maskapai',
         'bandara_asal',

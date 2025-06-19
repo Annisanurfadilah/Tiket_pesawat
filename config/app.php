@@ -209,6 +209,7 @@ return [
     */
 
     'aliases' => Facade::defaultAliases()->merge([
+        'Midtrans' => Midtrans\Config::class,
         // 'ExampleClass' => App\Example\ExampleClass::class,
     ])->toArray(),
 

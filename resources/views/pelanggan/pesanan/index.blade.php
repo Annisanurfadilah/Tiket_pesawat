@@ -1,11 +1,13 @@
+{{-- resources/views/pelanggan/pesanan/index.blade.php --}}
 @extends('layouts.appp')
 
-@section('title', 'Daftar Tiket Tersedia')
+@section('title', 'Riwayat Pesanan Saya') {{-- Ubah judul --}}
 
 @section('content')
 <div class="container mx-auto px-4 py-8">
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-4">Tiket Pesawat Tersedia</h1>
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Riwayat Pesanan Saya</h1> {{-- Ubah judul halaman --}}
+        <p class="text-gray-600">Daftar semua pesanan tiket Anda.</p>
     </div>
 
     @if(session('success'))
@@ -20,78 +22,101 @@
         </div>
     @endif
 
-    <!-- Tickets Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        @forelse($tikets as $tiket)
-            <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition duration-200">
-                <div class="p-6">
-                    <div class="flex justify-between items-start mb-4">
-                        <h3 class="text-xl font-semibold text-gray-800">{{ $tiket->maskapai }}</h3>
-                        <span class="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded">
-                            {{ $tiket->status }}
-                        </span>
-                    </div>
-                    
-                    <div class="space-y-2 mb-4">
-                        <div class="flex items-center text-gray-600">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                            {{ $tiket->rute }}
-                        </div>
-                        
-                        <div class="flex items-center text-gray-600">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4m-6 4v10h6V11"></path>
-                            </svg>
-                            {{ $tiket->tanggal_berangkat ? $tiket->tanggal_berangkat->format('d M Y') : '-' }}
-                        </div>
-                        
-                        <div class="flex items-center text-gray-600">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            {{ $tiket->waktu_berangkat ?? '-' }}
-                        </div>
-                        
-                        <div class="flex items-center text-gray-600">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                            </svg>
-                            Stok: {{ $tiket->stok ?? 0 }}
-                        </div>
-                    </div>
-                    
-                    <div class="flex justify-between items-center">
-                        <div class="text-2xl font-bold text-green-600">
-                            Rp {{ number_format($tiket->harga, 0, ',', '.') }}
-                        </div>
-                        
-                        @if($tiket->stok > 0 && $tiket->status == 'tersedia')
-                            <a href="{{ route('pelanggan.pesanan.create', $tiket->id) }}" 
-                               class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition duration-200">
-                                Pesan Sekarang
+    <div class="overflow-x-auto bg-white shadow-md rounded-lg">
+        <table class="min-w-full leading-normal">
+            <thead>
+                <tr>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Kode Booking
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Maskapai & Rute
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Jumlah Tiket
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Total Harga
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Status Pesanan
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Tanggal Pesan
+                    </th>
+                    <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($pesanan as $item) {{-- Ganti $tikets menjadi $pesanan --}}
+                    <tr>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            <p class="text-gray-900 whitespace-no-wrap">{{ $item->kode_booking }}</p>
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            @if($item->tiket)
+                                <p class="text-gray-900 whitespace-no-wrap">{{ $item->tiket->maskapai }}</p>
+                                <p class="text-gray-600 text-xs whitespace-no-wrap">{{ $item->tiket->bandara_asal }} &rarr; {{ $item->tiket->bandara_tujuan }}</p>
+                                <p class="text-gray-600 text-xs whitespace-no-wrap">
+                                    {{ \Carbon\Carbon::parse($item->tiket->tanggal_keberangkatan)->format('d M Y') }}
+                                </p>
+                            @else
+                                <p class="text-gray-600 whitespace-no-wrap">Tiket tidak ditemukan</p>
+                            @endif
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            <p class="text-gray-900 whitespace-no-wrap">{{ $item->jumlah_tiket }}</p>
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            <p class="text-gray-900 whitespace-no-wrap">Rp {{ number_format($item->total_harga, 0, ',', '.') }}</p>
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            <span class="relative inline-block px-3 py-1 font-semibold leading-tight">
+                                <span aria-hidden="true" class="absolute inset-0 opacity-50 rounded-full
+                                    @if($item->status_pesanan == 'menunggu_pembayaran') bg-yellow-200
+                                    @elseif($item->status_pesanan == 'diproses') bg-blue-200
+                                    @elseif($item->status_pesanan == 'selesai') bg-green-200
+                                    @elseif($item->status_pesanan == 'dibatalkan') bg-red-200
+                                    @else bg-gray-200 @endif"></span>
+                                <span class="relative capitalize">
+                                    {{ str_replace('_', ' ', $item->status_pesanan) }}
+                                </span>
+                            </span>
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            <p class="text-gray-900 whitespace-no-wrap">
+                                {{ $item->created_at->format('d M Y H:i') }}
+                            </p>
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-right">
+                            <a href="{{ route('pelanggan.pesanan.show', $item->id) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                                Lihat Detail
                             </a>
-                        @else
-                            <button disabled class="bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed">
-                                Tidak Tersedia
-                            </button>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        @empty
-            <div class="col-span-full text-center py-12">
-                <div class="text-gray-500 text-lg">Tidak ada tiket tersedia saat ini.</div>
-            </div>
-        @endforelse
+                            {{-- Tambahkan tombol batal jika status memungkinkan --}}
+                            @if($item->status_pesanan == 'menunggu_pembayaran' || $item->status_pesanan == 'pending')
+                                <form action="{{ route('pelanggan.pesanan.cancel', $item->id) }}" method="POST" class="inline-block" onsubmit="return confirm('Anda yakin ingin membatalkan pesanan ini?');">
+                                    @csrf
+                                    <button type="submit" class="text-red-600 hover:text-red-900">
+                                        Batal
+                                    </button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="px-5 py-5 border-b border-gray-200 bg-white text-sm text-center text-gray-500">
+                            Anda belum memiliki pesanan.
+                            <a href="{{ route('pelanggan.tiket.index') }}" class="text-blue-600 hover:underline">Pesan tiket sekarang!</a>
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
     </div>
 
-    <!-- Pagination -->
     <div class="mt-8">
-        {{ $tikets->links() }}
+        {{ $pesanan->links() }} {{-- Ganti $tikets->links() menjadi $pesanan->links() --}}
     </div>
 </div>
 @endsection

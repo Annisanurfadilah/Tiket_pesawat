@@ -3,173 +3,164 @@
 namespace App\Http\Controllers\Pelanggan;
 
 use App\Http\Controllers\Controller;
-use App\Models\Tiket;
-use App\Models\Pesanan;
 use Illuminate\Http\Request;
+use App\Models\Pesanan;
+use App\Models\Tiket; // Make sure to import Tiket model
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str; // For Str::random() if used for kode_booking
 
 class PesananController extends Controller
 {
     /**
-     * Display a listing of available tickets
+     * Display a listing of the resource (customer's orders).
      */
     public function index()
     {
-        $tikets = Tiket::where('status', 'tersedia')
-                      ->where('stok', '>', 0)
-                      ->orderBy('created_at', 'desc')
-                      ->paginate(10);
-        
-        return view('pelanggan.pesanan.index', compact('tikets'));
+        $pesanan = Auth::user()->pesanan()->latest()->paginate(10);
+        return view('pelanggan.pesanan.index', compact('pesanan'));
     }
 
     /**
-     * Show the form for creating a new order
-     * Parameter $tiket akan di-inject oleh Route Model Binding
+     * Show the form for creating a new resource (generic, no specific ticket pre-selected).
+     * This method will now list tickets for selection.
      */
-    public function create(Tiket $tiket)
+    public function create()
     {
-        // Check if ticket is still available
-        if ($tiket->stok <= 0 || $tiket->status != 'tersedia') {
-            return redirect()->route('pelanggan.pesanan.index')
-                ->with('error', 'Tiket tidak tersedia atau sudah habis.');
-        }
-
-        return view('pelanggan.pesanan.create', compact('tiket'));
+        // This is the generic 'create' from the resource route
+        // It should lead to a page where the user can select a ticket first.
+        $tikets = Tiket::where('stok', '>', 0)->get(); // Example: get available tickets
+        return view('pelanggan.pesanan.create_select_ticket', compact('tikets')); // A new view file
     }
 
     /**
-     * Alternative method jika ingin menggunakan ID manual
+     * Show the form for creating a new resource (with a specific ticket pre-selected).
+     * This method is now called 'createWithTiket' if you chose to rename the route.
+     * If you keep the original route name, ensure this is distinct from the resource's create.
      */
-    public function createById($tiketId)
+    public function createWithTiket(Tiket $tiket) // Laravel will inject the Tiket model
     {
-        $tiket = Tiket::findOrFail($tiketId);
-
-        // Check if ticket is still available
-        if ($tiket->stok <= 0 || $tiket->status != 'tersedia') {
-            return redirect()->route('pelanggan.pesanan.index')
-                ->with('error', 'Tiket tidak tersedia atau sudah habis.');
-        }
-
-        return view('pelanggan.pesanan.create', compact('tiket'));
+        // This method receives a specific Tiket model
+        return view('pelanggan.pesanan.create_form', compact('tiket')); // The actual form to fill out
     }
 
+
     /**
-     * Store a newly created order in storage
+     * Store a newly created resource in storage.
      */
     public function store(Request $request)
     {
         $request->validate([
             'tiket_id' => 'required|exists:tikets,id',
-            'jumlah_tiket' => 'required|integer|min:1|max:10',
-            'nama_penumpang' => 'required|string|max:255',
-            'nomor_identitas' => 'required|string|max:50',
-            'nomor_telepon' => 'required|string|max:20',
+            'jumlah_tiket' => 'required|integer|min:1',
+            // Add other validation rules as needed
         ]);
 
         $tiket = Tiket::findOrFail($request->tiket_id);
 
-        // Check availability
-        if ($tiket->stok < $request->jumlah_tiket || $tiket->status != 'tersedia') {
-            return redirect()->back()
-                ->with('error', 'Stok tiket tidak mencukupi atau tiket tidak tersedia.')
-                ->withInput();
+        if ($tiket->stok < $request->jumlah_tiket) {
+            return redirect()->back()->with('error', 'Stok tiket tidak mencukupi.');
         }
 
-        // Calculate total price
-        $totalHarga = $tiket->harga * $request->jumlah_tiket;
+        $totalHarga = $request->jumlah_tiket * $tiket->harga;
 
-        // Create order
         $pesanan = Pesanan::create([
             'user_id' => Auth::id(),
             'tiket_id' => $tiket->id,
             'jumlah_tiket' => $request->jumlah_tiket,
             'total_harga' => $totalHarga,
-            'nama_penumpang' => $request->nama_penumpang,
-            'nomor_identitas' => $request->nomor_identitas,
-            'nomor_telepon' => $request->nomor_telepon,
-            'status_pesanan' => 'pending',
-            'kode_booking' => $this->generateBookingCode(),
+            'kode_booking' => 'BK-' . Str::upper(Str::random(8)), // Example unique code
+            'status_pesanan' => 'menunggu_pembayaran',
+            'status_pembayaran' => 'pending',
+            // Other fields will be null/default
         ]);
 
-        // Update ticket stock
+        // Reduce ticket stock
         $tiket->decrement('stok', $request->jumlah_tiket);
 
-        // Update status if stock is empty
-        if ($tiket->stok <= 0) {
-            $tiket->update(['status' => 'habis']);
-        }
+        // Here, integrate with Midtrans to get the payment URL
+        // Example (pseudocode):
+        // $midtrans = new MidtransService();
+        // $snapToken = $midtrans->getSnapToken($pesanan);
+        // $pesanan->update(['url_pembayaran_midtrans' => $snapToken->redirect_url]);
 
-        return redirect()->route('pelanggan.pesanan.show', $pesanan->id)
-            ->with('success', 'Pesanan berhasil dibuat! Silakan lakukan pembayaran.');
+        return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('success', 'Pesanan berhasil dibuat!');
     }
 
     /**
-     * Display the specified order
+     * Display the specified resource.
      */
     public function show(Pesanan $pesanan)
     {
-        // Ensure user can only view their own orders
+        // Ensure the authenticated user owns this order
         if ($pesanan->user_id !== Auth::id()) {
-            abort(403, 'Unauthorized action.');
+            abort(403); // Forbidden
         }
-
         return view('pelanggan.pesanan.show', compact('pesanan'));
     }
 
     /**
-     * Display user's order history
+     * Show the form for editing the specified resource (uncommon for customer to edit order directly).
+     * This is usually for admin. If customer can edit, define logic here.
+     */
+    public function edit(Pesanan $pesanan)
+    {
+        // If customers can edit, add logic here. Otherwise, remove or restrict.
+        abort(404); // Not found for customer
+    }
+
+    /**
+     * Update the specified resource in storage (uncommon for customer to update order directly).
+     * This is usually for admin. If customer can update, define logic here.
+     */
+    public function update(Request $request, Pesanan $pesanan)
+    {
+        // If customers can update, add logic here. Otherwise, remove or restrict.
+        abort(404); // Not found for customer
+    }
+
+    /**
+     * Remove the specified resource from storage (uncommon for customer to delete order).
+     * Customers typically cancel, not delete.
+     */
+    public function destroy(Pesanan $pesanan)
+    {
+        // If customers can delete, add logic here. Otherwise, remove or restrict.
+        abort(404); // Not found for customer
+    }
+
+    /**
+     * Display a history of the customer's orders.
      */
     public function history()
     {
-        $pesanans = Pesanan::where('user_id', Auth::id())
-                           ->with('tiket')
-                           ->orderBy('created_at', 'desc')
-                           ->paginate(10);
-
-        return view('pelanggan.pesanan.history', compact('pesanans'));
+        $pesanan = Auth::user()->pesanan()->latest()->paginate(15);
+        return view('pelanggan.pesanan.history', compact('pesanan'));
     }
 
     /**
-     * Cancel an order
+     * Handle order cancellation by the customer.
      */
-    public function cancel(Pesanan $pesanan)
+    public function cancel(Request $request, Pesanan $pesanan)
     {
-        // Ensure user can only cancel their own orders
         if ($pesanan->user_id !== Auth::id()) {
-            abort(403, 'Unauthorized action.');
+            abort(403);
         }
 
-        // Only allow cancellation for pending orders
-        if ($pesanan->status_pesanan !== 'pending') {
-            return redirect()->back()
-                ->with('error', 'Pesanan tidak dapat dibatalkan.');
+        // Only allow cancellation if order is in a cancellable state (e.g., 'menunggu_pembayaran', 'pending')
+        if ($pesanan->status_pesanan === 'menunggu_pembayaran' || $pesanan->status_pembayaran === 'pending') {
+            $pesanan->update([
+                'status_pesanan' => 'dibatalkan',
+                'status_pembayaran' => 'cancelled', // Or a new status like 'refund_pending'
+            ]);
+
+            // Return stock to ticket if necessary
+            if ($pesanan->tiket) {
+                $pesanan->tiket->increment('stok', $pesanan->jumlah_tiket);
+            }
+
+            return redirect()->route('pelanggan.pesanan.history')->with('success', 'Pesanan berhasil dibatalkan.');
         }
 
-        // Restore ticket stock
-        $pesanan->tiket->increment('stok', $pesanan->jumlah_tiket);
-        
-        // Update ticket status if it was 'habis'
-        if ($pesanan->tiket->status === 'habis') {
-            $pesanan->tiket->update(['status' => 'tersedia']);
-        }
-
-        // Update order status
-        $pesanan->update(['status_pesanan' => 'dibatalkan']);
-
-        return redirect()->back()
-            ->with('success', 'Pesanan berhasil dibatalkan.');
-    }
-
-    /**
-     * Generate unique booking code
-     */
-    private function generateBookingCode()
-    {
-        do {
-            $code = 'TKT' . strtoupper(uniqid());
-        } while (Pesanan::where('kode_booking', $code)->exists());
-
-        return $code;
+        return redirect()->back()->with('error', 'Pesanan tidak dapat dibatalkan pada status ini.');
     }
 }
