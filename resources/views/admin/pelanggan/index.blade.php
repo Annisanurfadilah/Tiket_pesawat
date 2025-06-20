@@ -31,7 +31,7 @@
             <h3 class="fw-bold text-white mb-0">
                 <i class="bi bi-people-fill me-2"></i> Daftar Pelanggan
             </h3>
-            <form action="{{ route('admin.pelanggan') }}" method="GET" class="d-flex flex-wrap gap-2 filter-form">
+            <form action="{{ route('admin.pelanggan.index') }}" method="GET" class="d-flex flex-wrap gap-2 filter-form">
                 <input type="text" name="search" class="form-control" placeholder="Cari nama/email..." value="{{ request('search') }}">
                 <select name="status" class="form-select">
                     <option value="">Semua Status</option>
@@ -65,7 +65,7 @@
                             <td class="text-start">{{ $user->nama }}</td>
                             <td class="text-start">{{ $user->email }}</td>
                             <td>
-                                <a href="{{ route('admin.pelanggan.detail', $user->id) }}" class="btn btn-sm btn-outline-info rounded-pill">
+                                <a href="{{ route('admin.pelanggan.show', $user->id) }}" class="btn btn-sm btn-outline-info rounded-pill">
                                     <i class="bi bi-eye"></i> Detail
                                 </a>
                             </td>

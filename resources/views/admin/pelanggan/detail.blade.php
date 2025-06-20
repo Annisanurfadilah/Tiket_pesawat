@@ -6,7 +6,7 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Detail Pelanggan</h5>
-        <a href="{{ route('admin.pelanggan') }}" class="btn btn-sm btn-secondary">
+        <a href="{{ route('admin.pelanggan.index') }}" class="btn btn-sm btn-secondary">
             <i class="bi bi-arrow-left"></i> Kembali
         </a>
     </div>

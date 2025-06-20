@@ -157,7 +157,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {{ request()->routeIs('admin.pelanggan*') ? 'active' : '' }}" href="{{ route('admin.pelanggan') }}">
+                    <a class="nav-link {{ request()->routeIs('admin.pelanggan*') ? 'active' : '' }}" href="{{ route('admin.pelanggan.index') }}">
                         <i class="bi bi-people me-2"></i>Kelola Pelanggan
                     </a>
                 </li>

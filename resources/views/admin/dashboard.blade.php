@@ -105,7 +105,7 @@
     <div class="card shadow border-0 mb-4 rounded-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="fw-bold text-primary mb-0"><i class="bi bi-people me-2"></i>Pelanggan Terbaru</h5>
-            <a href="{{ route('admin.pelanggan') }}" class="btn btn-sm btn-outline-primary">
+            <a href="{{ route('admin.pelanggan.index') }}" class="btn btn-sm btn-outline-primary">
                 Lihat Semua
             </a>
         </div>
