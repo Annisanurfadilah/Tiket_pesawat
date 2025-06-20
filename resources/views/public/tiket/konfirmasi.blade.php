@@ -46,7 +46,7 @@
                 <i class="fas fa-ticket-alt mr-2"></i> Cari Tiket Lain
             </a>
             @auth
-                <a href="{{ route('pelanggan.pesanan.history') }}" class="inline-flex items-center justify-center bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors duration-200">
+                <a href="{{ route('pelanggan.pesanan.index') }}" class="inline-flex items-center justify-center bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors duration-200">
                     <i class="fas fa-history mr-2"></i> Riwayat Pesanan
                 </a>
             @endauth

@@ -99,9 +99,6 @@ Route::prefix('pelanggan')->name('pelanggan.')->middleware(['auth', 'pelanggan']
     // Renamed for clarity to avoid conflict with resource's 'create' route
     Route::get('/pesanan/create/{tiket}', [PesananController::class, 'createWithTiket'])->name('pesanan.create.specific');
 
-    // History of customer's orders (distinct from resource's index if needed differently)
-    Route::get('/riwayat-pesanan', [PesananController::class, 'history'])->name('pesanan.history');
-
     // Route for customer to cancel their order
     Route::post('/pesanan/{pesanan}/cancel', [PesananController::class, 'cancel'])->name('pesanan.cancel');
 

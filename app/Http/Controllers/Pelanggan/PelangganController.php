@@ -64,7 +64,7 @@ class PelangganController extends Controller
             'catatan' => $request->catatan,
         ]);
 
-        return redirect()->route('pelanggan.pesanan')->with('success', 'Pesanan berhasil dibuat!');
+        return redirect()->route('pelanggan.pesanan.index')->with('success', 'Pesanan berhasil dibuat!');
     }
 
     // Lihat Pesanan

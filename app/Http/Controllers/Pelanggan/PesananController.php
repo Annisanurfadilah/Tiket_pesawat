@@ -134,7 +134,7 @@ class PesananController extends Controller
     public function history()
     {
         $pesanan = Auth::user()->pesanan()->latest()->paginate(15);
-        return view('pelanggan.pesanan.history', compact('pesanan'));
+        return view('pelanggan.pesanan.index', compact('pesanan'));
     }
 
     /**
@@ -158,7 +158,7 @@ class PesananController extends Controller
                 $pesanan->tiket->increment('stok', $pesanan->jumlah_tiket);
             }
 
-            return redirect()->route('pelanggan.pesanan.history')->with('success', 'Pesanan berhasil dibatalkan.');
+            return redirect()->route('pelanggan.pesanan.index')->with('success', 'Pesanan berhasil dibatalkan.');
         }
 
         return redirect()->back()->with('error', 'Pesanan tidak dapat dibatalkan pada status ini.');
