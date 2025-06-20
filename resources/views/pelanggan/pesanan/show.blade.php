@@ -12,7 +12,7 @@
                 @if($pesanan->status_pesanan == 'menunggu_pembayaran') bg-yellow-100 text-yellow-800
                 @elseif($pesanan->status_pesanan == 'diproses') bg-blue-100 text-blue-800
                 @elseif($pesanan->status_pesanan == 'selesai') bg-green-100 text-green-800
-                @elseif($pesanan->status_pesanan == 'dibatalkan') bg-red-100 text-red-800
+                @elseif($pesanan->status_pesanan == 'dibatalkan' || $pesanan->status_pesanan == 'gagal') bg-red-100 text-red-800
                 @else bg-gray-100 text-gray-800 @endif">
                 {{ str_replace('_', ' ', strtoupper($pesanan->status_pesanan)) }}
             </span>
@@ -30,6 +30,12 @@
                 <span class="block sm:inline">{{ session('error') }}</span>
             </div>
         @endif
+        @if(session('info'))
+            <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <strong class="font-bold">Informasi:</strong>
+                <span class="block sm:inline">{{ session('info') }}</span>
+            </div>
+        @endif
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8 text-gray-700">
             <div>
@@ -38,7 +44,10 @@
                 <p class="mb-2"><strong class="w-32 inline-block">Tanggal Pesan:</strong> {{ $pesanan->created_at->format('d F Y, H:i') }}</p>
                 <p class="mb-2"><strong class="w-32 inline-block">Jumlah Tiket:</strong> {{ $pesanan->jumlah_tiket }}</p>
                 <p class="mb-2"><strong class="w-32 inline-block">Total Harga:</strong> <span class="text-green-600 font-bold text-xl">Rp {{ number_format($pesanan->total_harga, 0, ',', '.') }}</span></p>
-                <p class="mb-2"><strong class="w-32 inline-block">Status Pembayaran:</strong> <span class="capitalize">{{ $pesanan->status_pembayaran }}</span></p>
+                <p class="mb-2"><strong class="w-32 inline-block">Status Pembayaran:</strong> <span class="capitalize">{{ str_replace('_', ' ', $pesanan->status_pembayaran) }}</span></p>
+                @if($pesanan->midtrans_transaction_status)
+                    <p class="mb-2"><strong class="w-32 inline-block">Midtrans Status:</strong> <span class="capitalize">{{ str_replace('_', ' ', $pesanan->midtrans_transaction_status) }}</span></p>
+                @endif
             </div>
 
             @if($pesanan->tiket)
@@ -52,7 +61,7 @@
             </div>
             @else
             <div class="col-span-full">
-                <p class="text-red-500">Informasi tiket tidak tersedia.</p>
+                <p class="text-red-500">Informasi tiket tidak tersedia (kemungkinan tiket telah dihapus).</p>
             </div>
             @endif
         </div>
@@ -82,6 +91,13 @@
                 <span class="inline-flex items-center px-6 py-3 bg-green-500 text-white rounded-md font-medium">
                     <i class="fas fa-check-circle mr-2"></i> Pesanan Selesai
                 </span>
+            @elseif($pesanan->status_pembayaran === 'failed' || $pesanan->status_pembayaran === 'expired' || $pesanan->status_pembayaran === 'cancelled' || $pesanan->status_pembayaran === 'challenge' || $pesanan->status_pesanan === 'gagal')
+                 <form action="{{ route('pelanggan.pesanan.retry-payment', $pesanan->id) }}" method="POST" class="inline-block">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center px-6 py-3 bg-yellow-600 text-white rounded-md font-medium hover:bg-yellow-700 transition-colors duration-200">
+                        <i class="fas fa-redo-alt mr-2"></i> Coba Lagi Pembayaran
+                    </button>
+                </form>
             @endif
         </div>
     </div>

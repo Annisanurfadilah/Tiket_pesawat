@@ -5,12 +5,23 @@ namespace App\Http\Controllers\Pelanggan;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Pesanan;
-use App\Models\Tiket; // Make sure to import Tiket model
+use App\Models\Tiket;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str; // For Str::random() if used for kode_booking
+use Illuminate\Support\Str;
+use Midtrans\Snap; // Import Midtrans Snap
+use Midtrans\Config; // Import Midtrans Config
 
 class PesananController extends Controller
 {
+    public function __construct()
+    {
+        // Set Midtrans Configuration
+        Config::$serverKey = config('midtrans.server_key');
+        Config::$isProduction = config('midtrans.is_production');
+        Config::$isSanitized = config('midtrans.is_sanitized');
+        Config::$is3ds = config('midtrans.is_3ds');
+    }
+
     /**
      * Display a listing of the resource (customer's orders).
      */
@@ -22,27 +33,24 @@ class PesananController extends Controller
 
     /**
      * Show the form for creating a new resource (generic, no specific ticket pre-selected).
-     * This method will now list tickets for selection.
      */
     public function create()
     {
-        // This is the generic 'create' from the resource route
-        // It should lead to a page where the user can select a ticket first.
-        $tikets = Tiket::where('stok', '>', 0)->get(); // Example: get available tickets
-        return view('pelanggan.pesanan.create_select_ticket', compact('tikets')); // A new view file
+        $tikets = Tiket::where('stok', '>', 0)->get();
+        return view('pelanggan.pesanan.create_select_ticket', compact('tikets'));
     }
 
     /**
      * Show the form for creating a new resource (with a specific ticket pre-selected).
-     * This method is now called 'createWithTiket' if you chose to rename the route.
-     * If you keep the original route name, ensure this is distinct from the resource's create.
      */
-    public function createWithTiket(Tiket $tiket) // Laravel will inject the Tiket model
+    public function createWithTiket(Tiket $tiket)
     {
-        // This method receives a specific Tiket model
-        return view('pelanggan.pesanan.create_form', compact('tiket')); // The actual form to fill out
+        // Ensure ticket is available and has stock
+        if (!$tiket->isAvailable() || $tiket->stok <= 0) {
+            return redirect()->back()->with('error', 'Tiket tidak tersedia atau stok habis.');
+        }
+        return view('pelanggan.pesanan.create_form', compact('tiket'));
     }
-
 
     /**
      * Store a newly created resource in storage.
@@ -52,7 +60,6 @@ class PesananController extends Controller
         $request->validate([
             'tiket_id' => 'required|exists:tikets,id',
             'jumlah_tiket' => 'required|integer|min:1',
-            // Add other validation rules as needed
         ]);
 
         $tiket = Tiket::findOrFail($request->tiket_id);
@@ -63,27 +70,77 @@ class PesananController extends Controller
 
         $totalHarga = $request->jumlah_tiket * $tiket->harga;
 
+        // Check if an existing pending order exists for this user and ticket
+        // This prevents duplicate orders if user refreshes page after payment
+        $existingPesanan = Pesanan::where('user_id', Auth::id())
+                                   ->where('tiket_id', $tiket->id)
+                                   ->whereIn('status_pembayaran', ['pending', 'menunggu_pembayaran'])
+                                   ->first();
+
+        if ($existingPesanan) {
+            return redirect()->route('pelanggan.pesanan.show', $existingPesanan->id)
+                             ->with('info', 'Anda sudah memiliki pesanan pending untuk tiket ini. Silakan lanjutkan pembayaran.');
+        }
+
         $pesanan = Pesanan::create([
             'user_id' => Auth::id(),
             'tiket_id' => $tiket->id,
             'jumlah_tiket' => $request->jumlah_tiket,
             'total_harga' => $totalHarga,
-            'kode_booking' => 'BK-' . Str::upper(Str::random(8)), // Example unique code
+            // 'kode_booking' is generated in Pesanan model's boot method
             'status_pesanan' => 'menunggu_pembayaran',
             'status_pembayaran' => 'pending',
-            // Other fields will be null/default
         ]);
 
-        // Reduce ticket stock
+        // Reduce ticket stock after successful order creation
         $tiket->decrement('stok', $request->jumlah_tiket);
 
-        // Here, integrate with Midtrans to get the payment URL
-        // Example (pseudocode):
-        // $midtrans = new MidtransService();
-        // $snapToken = $midtrans->getSnapToken($pesanan);
-        // $pesanan->update(['url_pembayaran_midtrans' => $snapToken->redirect_url]);
+        // --- Midtrans Integration ---
+        try {
+            $params = array(
+                'transaction_details' => array(
+                    'order_id' => $pesanan->kode_booking, // Use kode_booking as Midtrans order ID
+                    'gross_amount' => $pesanan->total_harga,
+                ),
+                'customer_details' => array(
+                    'first_name' => Auth::user()->nama,
+                    'email' => Auth::user()->email,
+                    'phone' => Auth::user()->nomor_telepon,
+                    // 'address' => Auth::user()->alamat, // Add if needed
+                ),
+                'item_details' => [
+                    [
+                        'id' => $tiket->id,
+                        'price' => $tiket->harga,
+                        'quantity' => $pesanan->jumlah_tiket,
+                        'name' => $tiket->maskapai . ' - ' . $tiket->bandara_asal . ' to ' . $tiket->bandara_tujuan,
+                    ]
+                ],
+                'callbacks' => [
+                    'finish' => route('midtrans.finish'),
+                    'unfinish' => route('midtrans.unfinish'),
+                    'error' => route('midtrans.error'),
+                ]
+            );
 
-        return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('success', 'Pesanan berhasil dibuat!');
+            $snapToken = Snap::getSnapToken($params);
+            $pesanan->update([
+                'url_pembayaran_midtrans' => 'https://app.sandbox.midtrans.com/snap/v1/pay/' . $snapToken, // Snap URL + Snap Token
+                'midtrans_transaction_id' => null, // Will be filled by callback
+                'midtrans_transaction_status' => 'pending', // Initial Midtrans status
+            ]);
+
+            return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('success', 'Pesanan berhasil dibuat. Lanjutkan pembayaran.');
+
+        } catch (\Exception $e) {
+            // If Midtrans Snap token generation fails, revert stock and set order status to failed
+            $tiket->increment('stok', $request->jumlah_tiket); // Revert stock
+            $pesanan->update([
+                'status_pesanan' => 'gagal',
+                'status_pembayaran' => 'failed_midtrans_init',
+            ]);
+            return redirect()->back()->with('error', 'Gagal membuat transaksi pembayaran: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -91,7 +148,6 @@ class PesananController extends Controller
      */
     public function show(Pesanan $pesanan)
     {
-        // Ensure the authenticated user owns this order
         if ($pesanan->user_id !== Auth::id()) {
             abort(403); // Forbidden
         }
@@ -104,7 +160,6 @@ class PesananController extends Controller
      */
     public function edit(Pesanan $pesanan)
     {
-        // If customers can edit, add logic here. Otherwise, remove or restrict.
         abort(404); // Not found for customer
     }
 
@@ -114,7 +169,6 @@ class PesananController extends Controller
      */
     public function update(Request $request, Pesanan $pesanan)
     {
-        // If customers can update, add logic here. Otherwise, remove or restrict.
         abort(404); // Not found for customer
     }
 
@@ -124,17 +178,7 @@ class PesananController extends Controller
      */
     public function destroy(Pesanan $pesanan)
     {
-        // If customers can delete, add logic here. Otherwise, remove or restrict.
         abort(404); // Not found for customer
-    }
-
-    /**
-     * Display a history of the customer's orders.
-     */
-    public function history()
-    {
-        $pesanan = Auth::user()->pesanan()->latest()->paginate(15);
-        return view('pelanggan.pesanan.index', compact('pesanan'));
     }
 
     /**
@@ -150,7 +194,7 @@ class PesananController extends Controller
         if ($pesanan->status_pesanan === 'menunggu_pembayaran' || $pesanan->status_pembayaran === 'pending') {
             $pesanan->update([
                 'status_pesanan' => 'dibatalkan',
-                'status_pembayaran' => 'cancelled', // Or a new status like 'refund_pending'
+                'status_pembayaran' => 'cancelled',
             ]);
 
             // Return stock to ticket if necessary
@@ -162,5 +206,61 @@ class PesananController extends Controller
         }
 
         return redirect()->back()->with('error', 'Pesanan tidak dapat dibatalkan pada status ini.');
+    }
+
+    /**
+     * Re-attempt payment for a pending order.
+     */
+    public function retryPayment(Pesanan $pesanan)
+    {
+        if ($pesanan->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        // Only allow re-attempt if the order is still pending payment
+        if ($pesanan->status_pembayaran === 'pending' || $pesanan->status_pembayaran === 'failed_midtrans_init') {
+            try {
+                $params = array(
+                    'transaction_details' => array(
+                        'order_id' => $pesanan->kode_booking,
+                        'gross_amount' => $pesanan->total_harga,
+                    ),
+                    'customer_details' => array(
+                        'first_name' => Auth::user()->nama,
+                        'email' => Auth::user()->email,
+                        'phone' => Auth::user()->nomor_telepon,
+                    ),
+                    'item_details' => [
+                        [
+                            'id' => $pesanan->tiket->id,
+                            'price' => $pesanan->tiket->harga,
+                            'quantity' => $pesanan->jumlah_tiket,
+                            'name' => $pesanan->tiket->maskapai . ' - ' . $pesanan->tiket->bandara_asal . ' to ' . $pesanan->tiket->bandara_tujuan,
+                        ]
+                    ],
+                    'callbacks' => [
+                        'finish' => route('midtrans.finish'),
+                        'unfinish' => route('midtrans.unfinish'),
+                        'error' => route('midtrans.error'),
+                    ]
+                );
+
+                $snapToken = Snap::getSnapToken($params);
+                $pesanan->update([
+                    'url_pembayaran_midtrans' => 'https://app.sandbox.midtrans.com/snap/v1/pay/' . $snapToken,
+                    'midtrans_transaction_id' => null, // Reset if new transaction initiated
+                    'midtrans_transaction_status' => 'pending',
+                    'status_pembayaran' => 'pending', // Set status back to pending
+                    'status_pesanan' => 'menunggu_pembayaran', // Set status back
+                ]);
+
+                return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('success', 'Silakan lanjutkan pembayaran Anda.');
+
+            } catch (\Exception $e) {
+                return redirect()->back()->with('error', 'Gagal memuat ulang pembayaran: ' . $e->getMessage());
+            }
+        }
+
+        return redirect()->back()->with('error', 'Pesanan tidak dalam status yang dapat dicoba ulang pembayarannya.');
     }
 }

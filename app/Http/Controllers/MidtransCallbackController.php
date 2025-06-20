@@ -2,91 +2,102 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pesanan;
 use Illuminate\Http\Request;
-use Midtrans\Notification; // Pastikan ini di-import
-use DB;
+use App\Models\Pesanan;
+use Midtrans\Config;
+use Midtrans\Notification;
 
 class MidtransCallbackController extends Controller
 {
+    public function __construct()
+    {
+        // Set Midtrans Configuration
+        Config::$serverKey = config('midtrans.server_key');
+        Config::$isProduction = config('midtrans.is_production');
+        Config::$isSanitized = config('midtrans.is_sanitized');
+        Config::$is3ds = config('midtrans.is_3ds');
+    }
+
+    /**
+     * Handle Midtrans notification callback (Webhook).
+     * This method is called by Midtrans servers.
+     */
     public function callback(Request $request)
     {
-        // Set your Merchant Server Key
-        \Midtrans\Config::$serverKey = config('midtrans.server_key');
-        // Set to Development/Sandbox Environment (default is false)
-        \Midtrans\Config::$isProduction = config('midtrans.is_production');
-        // Set sanitization on (default is true)
-        \Midtrans\Config::$isSanitized = true;
+        $notification = new Notification();
 
-        // Create Snap object
-        $notif = new Notification();
-
-        $transaction = $notif->transaction_status;
-        $type = $notif->payment_type;
-        $orderId = $notif->order_id; // Ini adalah kode_booking yang kita kirim
-        $fraud = $notif->fraud_status;
+        $transactionStatus = $notification->transaction_status;
+        $orderId = $notification->order_id; // This is kode_booking in our Pesanan model
+        $fraudStatus = $notification->fraud_status;
 
         $pesanan = Pesanan::where('kode_booking', $orderId)->first();
 
         if (!$pesanan) {
-            return response()->json(['message' => 'Pesanan tidak ditemukan'], 404);
+            // Log this error: order not found
+            return response()->json(['message' => 'Order not found'], 404);
         }
 
-        // Update Midtrans status di database
-        $pesanan->midtrans_transaction_status = $transaction;
+        // Update Midtrans transaction ID if it's new
+        if (empty($pesanan->midtrans_transaction_id) && !empty($notification->transaction_id)) {
+            $pesanan->midtrans_transaction_id = $notification->transaction_id;
+        }
+        $pesanan->midtrans_transaction_status = $transactionStatus; // Always update Midtrans status
 
-        // Logic berdasarkan status transaksi Midtrans
-        if ($transaction == 'capture') {
-            // Untuk pembayaran non-3ds, atau 3ds yang sudah settled
-            if ($type == 'credit_card') {
-                if ($fraud == 'challenge') {
-                    $pesanan->status_pembayaran = 'pending'; // Perlu verifikasi lebih lanjut
-                } else {
-                    $pesanan->status_pembayaran = 'paid'; // Pembayaran berhasil
-                    $pesanan->status_pesanan = 'diproses'; // Update status pesanan di aplikasi
-                }
+        if ($transactionStatus == 'capture') {
+            if ($fraudStatus == 'challenge') {
+                // TODO: Set pesanan status to pending or challenge (requires manual review)
+                $pesanan->status_pembayaran = 'challenge';
+                $pesanan->status_pesanan = 'diproses'; // Or 'menunggu_verifikasi'
+            } else if ($fraudStatus == 'accept') {
+                // TODO: Set pesanan status to success
+                $pesanan->status_pembayaran = 'paid';
+                $pesanan->status_pesanan = 'diproses'; // Payment successful, order is being processed
             }
-        } elseif ($transaction == 'settlement') {
-            // Untuk pembayaran yang sukses (misal: bank transfer, GoPay)
+        } else if ($transactionStatus == 'settlement') {
+            // TODO: Set pesanan status to success
             $pesanan->status_pembayaran = 'paid';
-            $pesanan->status_pesanan = 'diproses';
-        } elseif ($transaction == 'pending') {
-            // Menunggu pembayaran dari user
-            $pesanan->status_pembayaran = 'pending';
-        } elseif ($transaction == 'deny') {
-            // Pembayaran ditolak
-            $pesanan->status_pembayaran = 'failed';
-        } elseif ($transaction == 'expire') {
-            // Pembayaran kadaluarsa
-            $pesanan->status_pembayaran = 'failed';
-            $pesanan->status_pesanan = 'dibatalkan'; // Otomatis batalkan pesanan
-        } elseif ($transaction == 'cancel') {
-            // Pembayaran dibatalkan
+            $pesanan->status_pesanan = 'diproses'; // Payment successful, order is being processed
+        } else if ($transactionStatus == 'deny') {
+            // TODO: Set pesanan status to denied
             $pesanan->status_pembayaran = 'failed';
             $pesanan->status_pesanan = 'dibatalkan';
+            // Optionally, re-add stock if it was initially deducted for a failed payment
+            if ($pesanan->tiket && $pesanan->jumlah_tiket > 0) {
+                 // Only re-add stock if it hasn't been re-added by a prior cancellation or if you have a robust stock management system
+                 // Ensure this logic doesn't double-count if a cancel method already did this.
+                 // A flag might be needed on Pesanan, e.g., 'stock_returned_on_cancel'
+                 // For simplicity, let's assume if it reached 'deny', we should increment stock.
+                $pesanan->tiket->increment('stok', $pesanan->jumlah_tiket);
+            }
+        } else if ($transactionStatus == 'expire') {
+            // TODO: Set pesanan status to expired
+            $pesanan->status_pembayaran = 'expired';
+            $pesanan->status_pesanan = 'dibatalkan';
+            // Re-add stock
+            if ($pesanan->tiket && $pesanan->jumlah_tiket > 0) {
+                $pesanan->tiket->increment('stok', $pesanan->jumlah_tiket);
+            }
+        } else if ($transactionStatus == 'cancel') {
+            // TODO: Set pesanan status to cancel
+            $pesanan->status_pembayaran = 'cancelled';
+            $pesanan->status_pesanan = 'dibatalkan';
+            // Re-add stock
+            if ($pesanan->tiket && $pesanan->jumlah_tiket > 0) {
+                $pesanan->tiket->increment('stok', $pesanan->jumlah_tiket);
+            }
+        } else if ($transactionStatus == 'pending') {
+            $pesanan->status_pembayaran = 'pending';
+            $pesanan->status_pesanan = 'menunggu_pembayaran';
         }
 
         $pesanan->save();
 
-        // Jika statusnya 'paid' dan ini adalah update dari 'pending'
-        // Kurangi stok tiket jika pembayaran berhasil dan stok belum dikurangi
-        if ($pesanan->status_pembayaran == 'paid' && $pesanan->wasChanged('status_pembayaran')) {
-            $tiket = $pesanan->tiket;
-            if ($tiket && $tiket->stok >= $pesanan->jumlah_tiket) {
-                $tiket->decrement('stok', $pesanan->jumlah_tiket);
-            }
-        } elseif ($pesanan->status_pesanan == 'dibatalkan' && $pesanan->wasChanged('status_pesanan')) {
-             // Kembalikan stok jika pesanan dibatalkan (misal karena expire/cancel)
-             $tiket = $pesanan->tiket;
-             if ($tiket) {
-                 $tiket->increment('stok', $pesanan->jumlah_tiket);
-             }
-        }
-
-        return response()->json(['message' => 'Notification processed successfully'], 200);
+        return response()->json(['message' => 'OK'], 200);
     }
 
-    // Metode untuk callback URLs (Finish, Unfinish, Error) - ini biasanya hanya untuk redirect user, bukan webhook utama
+    /**
+     * Handle redirection after user finishes payment on Midtrans (for /midtrans-finish).
+     */
     public function finish(Request $request)
     {
         $orderId = $request->input('order_id');
@@ -94,28 +105,52 @@ class MidtransCallbackController extends Controller
         $pesanan = Pesanan::where('kode_booking', $orderId)->first();
 
         if ($pesanan) {
-            return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('success', 'Pembayaran Anda berhasil diproses.');
+            // Note: The main status update should come from the callback webhook.
+            // This is primarily for user experience redirection.
+            if ($transactionStatus == 'settlement' || $transactionStatus == 'capture') {
+                return redirect()->route('pelanggan.pesanan.show', $pesanan->id)
+                                 ->with('success', 'Pembayaran berhasil! Pesanan Anda sedang diproses.');
+            } elseif ($transactionStatus == 'pending') {
+                return redirect()->route('pelanggan.pesanan.show', $pesanan->id)
+                                 ->with('info', 'Pembayaran Anda sedang menunggu penyelesaian. Silakan selesaikan pembayaran.');
+            } else {
+                return redirect()->route('pelanggan.pesanan.show', $pesanan->id)
+                                 ->with('error', 'Pembayaran gagal atau dibatalkan.');
+            }
         }
-        return redirect()->route('pelanggan.dashboard')->with('info', 'Terima kasih telah berbelanja!');
+
+        return redirect()->route('pelanggan.pesanan.index')->with('error', 'Pesanan tidak ditemukan atau terjadi kesalahan.');
     }
 
+    /**
+     * Handle redirection after user leaves payment on Midtrans without finishing (for /midtrans-unfinish).
+     */
     public function unfinish(Request $request)
     {
         $orderId = $request->input('order_id');
         $pesanan = Pesanan::where('kode_booking', $orderId)->first();
+
         if ($pesanan) {
-            return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('warning', 'Pembayaran belum selesai. Silakan coba lagi.');
+            return redirect()->route('pelanggan.pesanan.show', $pesanan->id)
+                             ->with('info', 'Pembayaran Anda tidak diselesaikan. Silakan coba lagi.');
         }
-        return redirect()->route('pelanggan.dashboard')->with('error', 'Pembayaran tidak selesai.');
+
+        return redirect()->route('pelanggan.pesanan.index')->with('error', 'Pesanan tidak ditemukan atau terjadi kesalahan.');
     }
 
+    /**
+     * Handle redirection after payment error on Midtrans (for /midtrans-error).
+     */
     public function error(Request $request)
     {
         $orderId = $request->input('order_id');
         $pesanan = Pesanan::where('kode_booking', $orderId)->first();
+
         if ($pesanan) {
-            return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('error', 'Terjadi kesalahan saat pembayaran. Silakan coba lagi.');
+            return redirect()->route('pelanggan.pesanan.show', $pesanan->id)
+                             ->with('error', 'Terjadi kesalahan saat memproses pembayaran Anda. Silakan coba lagi.');
         }
-        return redirect()->route('pelanggan.dashboard')->with('error', 'Terjadi kesalahan pembayaran.');
+
+        return redirect()->route('pelanggan.pesanan.index')->with('error', 'Pesanan tidak ditemukan atau terjadi kesalahan.');
     }
 }

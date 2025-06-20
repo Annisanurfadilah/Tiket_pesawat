@@ -5,69 +5,55 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str; // Untuk Str::random() atau Str::uuid()
+use Illuminate\Support\Str;
 
 class Pesanan extends Model
 {
     use HasFactory;
 
-    protected $table = 'pesanan'; // Pastikan nama tabel benar
+    protected $table = 'pesanan';
 
     protected $fillable = [
-        'user_id', // Ganti 'pelanggan_id' menjadi 'user_id' sesuai foreignId di migrasi
+        'user_id',
         'tiket_id',
-        'jumlah_tiket', // Tambahkan
-        'kode_booking', // Tambahkan
-        'total_harga', // Tambahkan
-        'midtrans_transaction_id', // Tambahkan
-        'midtrans_transaction_status', // Tambahkan
-        'status_pembayaran', // Tambahkan
-        'bukti_pembayaran', // Tambahkan
-        'url_pembayaran_midtrans', // Tambahkan
-        'status_pesanan', // Tambahkan
-        // 'rute', // Hapus jika data diambil dari tiket_id
-        // 'harga', // Hapus jika data diambil dari tiket_id
-        // 'maskapai', // Hapus jika data diambil dari tiket_id
-        // 'jumlah_penumpang', // Ganti dengan jumlah_tiket, jika jumlah_penumpang adalah detail per orang, perlu tabel terpisah
+        'jumlah_tiket',
+        'kode_booking',
+        'total_harga',
+        'midtrans_transaction_id',
+        'midtrans_transaction_status',
+        'status_pembayaran',
+        'bukti_pembayaran',
+        'url_pembayaran_midtrans',
+        'status_pesanan',
     ];
 
     protected $casts = [
-        'total_harga' => 'decimal:2', // Sesuaikan cast untuk total_harga
+        'total_harga' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
-    /**
-     * Get the user (customer) that owns the order.
-     */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id'); // Sesuaikan dengan user_id
+        return $this->belongsTo(User::class, 'user_id');
     }
 
-    /**
-     * Get the tiket that belongs to the order.
-     */
     public function tiket(): BelongsTo
     {
         return $this->belongsTo(Tiket::class, 'tiket_id');
     }
 
-    /**
-     * Generate kode booking unik saat membuat pesanan baru
-     */
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($pesanan) {
-            // Pastikan kode booking digenerate hanya jika belum ada (misal dari form)
             if (empty($pesanan->kode_booking)) {
-                $pesanan->kode_booking = 'BK-' . strtoupper(Str::random(8)); // Contoh: BK-ABCDEFGH
-                // Pastikan unik. Anda bisa menambahkan loop do-while untuk menjamin keunikan
-                // atau menggunakan UUID jika lebih disukai
+                do {
+                    $kodeBooking = 'BK-' . strtoupper(Str::random(8));
+                } while (Pesanan::where('kode_booking', $kodeBooking)->exists()); // Ensure uniqueness
+                $pesanan->kode_booking = $kodeBooking;
             }
-            // Set status awal jika belum diset
             if (empty($pesanan->status_pesanan)) {
                 $pesanan->status_pesanan = 'menunggu_pembayaran';
             }
@@ -77,46 +63,39 @@ class Pesanan extends Model
         });
     }
 
-    /**
-     * Accessor untuk harga tiket (jika perlu ditampilkan)
-     * Ambil dari relasi tiket, atau dari kolom 'harga' jika disimpan sebagai snapshot
-     */
     public function getHargaTiketAttribute(): ?float
     {
-        return $this->tiket->harga ?? null; // Mengambil harga dari relasi tiket
-        // Atau jika disimpan di kolom 'harga' di tabel pesanan:
-        // return $this->harga;
+        return $this->tiket->harga ?? null;
     }
 
-    /**
-     * Format total harga untuk tampilan
-     */
     public function getFormattedTotalHargaAttribute(): string
     {
         return 'Rp ' . number_format($this->total_harga, 0, ',', '.');
     }
 
-    /**
-     * Determine if the payment is successful.
-     */
     public function isPaid(): bool
     {
         return $this->status_pembayaran === 'paid';
     }
 
-    /**
-     * Determine if the order is completed.
-     */
     public function isCompleted(): bool
     {
         return $this->status_pesanan === 'selesai';
     }
 
-    /**
-     * Determine if the order is cancelled.
-     */
     public function isCancelled(): bool
     {
         return $this->status_pesanan === 'dibatalkan';
+    }
+
+    // Add these for more explicit checks
+    public function isPendingPayment(): bool
+    {
+        return $this->status_pembayaran === 'pending' || $this->status_pesanan === 'menunggu_pembayaran';
+    }
+
+    public function isFailed(): bool
+    {
+        return in_array($this->status_pembayaran, ['failed', 'expired', 'cancelled']);
     }
 }

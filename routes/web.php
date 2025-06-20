@@ -91,20 +91,15 @@ Route::prefix('pelanggan')->name('pelanggan.')->middleware(['auth', 'pelanggan']
     Route::get('/dashboard', [PelangganDashboardController::class, 'index'])->name('dashboard');
 
     // --- PESANAN ROUTES for Pelanggan ---
-    // Use resource for standard CRUD operations: index, create, store, show, edit, update, destroy
-    // NOTE: 'create' from resource route does NOT have {tiketId} parameter.
-    Route::resource('pesanan', PesananController::class)->except(['edit', 'update', 'destroy']); // Customers usually don't edit/delete orders via these standard routes
+    Route::resource('pesanan', PesananController::class)->except(['edit', 'update', 'destroy']);
 
-    // Specific route for creating a customer order with a pre-selected ticket ID
-    // Renamed for clarity to avoid conflict with resource's 'create' route
     Route::get('/pesanan/create/{tiket}', [PesananController::class, 'createWithTiket'])->name('pesanan.create.specific');
-
-    // Route for customer to cancel their order
     Route::post('/pesanan/{pesanan}/cancel', [PesananController::class, 'cancel'])->name('pesanan.cancel');
+    // New route for re-attempting payment
+    Route::post('/pesanan/{pesanan}/retry-payment', [PesananController::class, 'retryPayment'])->name('pesanan.retry-payment');
 
 
     // --- TIKET Browse ROUTES for Pelanggan ---
-    // These are for logged-in customers to browse and initiate booking
     Route::prefix('tiket')->name('tiket.')->group(function () {
         Route::get('/', [PublicTiketController::class, 'index'])->name('index');
         Route::get('/show/{tiket}', [PublicTiketController::class, 'show'])->name('show');
