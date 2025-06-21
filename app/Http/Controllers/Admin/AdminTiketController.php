@@ -7,7 +7,7 @@ use App\Models\Tiket;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
-class TiketController extends Controller
+class AdminTiketController extends Controller
 {
     public function index()
     {

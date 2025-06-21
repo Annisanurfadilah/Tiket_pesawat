@@ -25,6 +25,7 @@ class Pesanan extends Model
         'bukti_pembayaran',
         'url_pembayaran_midtrans',
         'status_pesanan',
+        // Tidak ada nama_pemesan, email_pemesan, dll. di sini
     ];
 
     protected $casts = [
@@ -51,7 +52,7 @@ class Pesanan extends Model
             if (empty($pesanan->kode_booking)) {
                 do {
                     $kodeBooking = 'BK-' . strtoupper(Str::random(8));
-                } while (Pesanan::where('kode_booking', $kodeBooking)->exists()); // Ensure uniqueness
+                } while (Pesanan::where('kode_booking', $kodeBooking)->exists());
                 $pesanan->kode_booking = $kodeBooking;
             }
             if (empty($pesanan->status_pesanan)) {
@@ -88,7 +89,6 @@ class Pesanan extends Model
         return $this->status_pesanan === 'dibatalkan';
     }
 
-    // Add these for more explicit checks
     public function isPendingPayment(): bool
     {
         return $this->status_pembayaran === 'pending' || $this->status_pesanan === 'menunggu_pembayaran';

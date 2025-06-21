@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 use Midtrans\Snap; // Import Midtrans Snap
 use Midtrans\Config; // Import Midtrans Config
 
-class PesananController extends Controller
+class PelangganPesananController extends Controller
 {
     public function __construct()
     {
@@ -49,7 +49,7 @@ class PesananController extends Controller
         if (!$tiket->isAvailable() || $tiket->stok <= 0) {
             return redirect()->back()->with('error', 'Tiket tidak tersedia atau stok habis.');
         }
-        return view('pelanggan.pesanan.create_form', compact('tiket'));
+        return view('pelanggan.pesanan.create', compact('tiket'));
     }
 
     /**

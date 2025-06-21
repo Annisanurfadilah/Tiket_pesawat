@@ -21,13 +21,13 @@ class AdminPelangganController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('nomor_telepon', 'like', "%{$search}%");
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('nomor_telepon', 'like', "%{$search}%");
             });
         }
 
-        if ($request->filled('status')) {
-            $query->where('aktif', $request->status == 'aktif');
+        if ($request->filled('status') && in_array($request->status, ['aktif', 'nonaktif'])) {
+            $query->where('status', $request->status);
         }
 
         $pelanggan = $query->orderBy('created_at', 'desc')->paginate(10);

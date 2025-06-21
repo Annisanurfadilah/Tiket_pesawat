@@ -5,32 +5,7 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-8">
-    {{-- Breadcrumb --}}
-    <nav class="flex mb-8" aria-label="Breadcrumb">
-        <ol class="inline-flex items-center space-x-1 md:space-x-3">
-            <li class="inline-flex items-center">
-                <a href="{{ route('tiket.index') }}" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600">
-                    Daftar Tiket
-                </a>
-            </li>
-            <li>
-                <div class="flex items-center">
-                    <svg class="w-3 h-3 text-gray-400 mx-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    <a href="{{ route('tiket.show', $tiket) }}" class="text-sm font-medium text-gray-700 hover:text-blue-600">Detail Tiket</a>
-                </div>
-            </li>
-            <li>
-                <div class="flex items-center">
-                    <svg class="w-3 h-3 text-gray-400 mx-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    <span class="ml-1 text-sm font-medium text-gray-500">Pemesanan</span>
-                </div>
-            </li>
-        </ol>
-    </nav>
+    {{-- ... (Breadcrumb dan bagian lainnya) ... --}}
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {{-- Form Section --}}
@@ -38,7 +13,7 @@
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h1 class="text-2xl font-bold text-gray-800 mb-6">Form Pemesanan Tiket</h1>
 
-                <form action="{{ route('tiket.proses-pesan', $tiket) }}" method="POST" id="bookingForm">
+                <form action="{{ route('pelanggan.tiket.proses-pesan', $tiket) }}" method="POST" id="bookingForm">
                     @csrf
                     
                     {{-- Personal Information --}}
@@ -67,7 +42,7 @@
                                 </label>
                                 <input type="email" 
                                        id="email" 
-                                       name="email" 
+                                       name="email"  {{-- Pastikan name ini 'email' --}}
                                        value="{{ old('email') }}"
                                        placeholder="contoh@email.com"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 @error('email') border-red-500 @enderror"
@@ -83,7 +58,7 @@
                                 </label>
                                 <input type="tel" 
                                        id="no_telepon" 
-                                       name="no_telepon" 
+                                       name="no_telepon" {{-- Pastikan name ini 'no_telepon' --}}
                                        value="{{ old('no_telepon') }}"
                                        placeholder="08xxxxxxxxxx"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 @error('no_telepon') border-red-500 @enderror"
@@ -139,12 +114,15 @@
                                     Saya menyetujui <a href="#" class="text-blue-600 hover:underline">syarat dan ketentuan</a> yang berlaku
                                 </span>
                             </label>
+                            @error('agree_terms')
+                                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
 
                     {{-- Submit Button --}}
                     <div class="flex flex-col sm:flex-row gap-4">
-                        <a href="{{ route('tiket.show', $tiket) }}" 
+                        <a href="{{ route('pelanggan.tiket.show', $tiket) }}" 
                            class="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-300 transition duration-200 text-center font-semibold">
                             Kembali
                         </a>
@@ -235,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTotal();
 });
 
-// Form validation
+// Form validation (client-side, server-side ada di controller)
 document.getElementById('bookingForm').addEventListener('submit', function(e) {
     const agreeTerms = document.getElementById('agree_terms').checked;
     

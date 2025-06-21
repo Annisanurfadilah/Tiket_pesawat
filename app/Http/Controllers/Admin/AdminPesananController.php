@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pesanan;
-use App\Models\Tiket; // Untuk mengembalikan stok jika pesanan dibatalkan
+use App\Models\Tiket;
 use Illuminate\Http\Request;
 
 class AdminPesananController extends Controller

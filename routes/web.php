@@ -6,15 +6,15 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminPelangganController;
 use App\Http\Controllers\Admin\AdminManajemenController;
 use App\Http\Controllers\Admin\AdminProfileController;
-use App\Http\Controllers\Admin\TiketController as AdminTiketController;
-use App\Http\Controllers\TiketController as PublicTiketController; // General ticket Browse
+use App\Http\Controllers\Admin\AdminTiketController;
+use App\Http\Controllers\Admin\AdminPesananController;
 
+use App\Http\Controllers\Pelanggan\PelangganTiketController;
 use App\Http\Controllers\Pelanggan\PelangganDashboardController;
 use App\Http\Controllers\Pelanggan\PelangganProfileController;
-use App\Http\Controllers\Pelanggan\PesananController; // Customer's PesananController
+use App\Http\Controllers\Pelanggan\PelangganPesananController;
 
 use App\Http\Controllers\MidtransCallbackController;
-use App\Http\Controllers\Admin\AdminPesananController; // Admin's PesananController
 
 /*
 |--------------------------------------------------------------------------
@@ -30,14 +30,14 @@ Route::get('/', function () {
     return view('welcome');
 })->name('welcome');
 
-Route::prefix('tiket')->name('tiket.')->group(function () {
-    Route::get('/', [PublicTiketController::class, 'index'])->name('index'); // Browse all tickets
-    Route::get('/show/{tiket}', [PublicTiketController::class, 'show'])->name('show'); // Show single ticket detail
-    Route::get('/pesan/{tiket}', [PublicTiketController::class, 'pesan'])->name('pesan'); // Form to start booking for a specific ticket (public view)
-    Route::post('/proses-pesan/{tiket}', [PublicTiketController::class, 'prosesPersan'])->name('proses-pesan'); // Process public booking
-    Route::get('/konfirmasi', [PublicTiketController::class, 'konfirmasi'])->name('konfirmasi'); // Public booking confirmation
-    Route::get('/api/bandara', [PublicTiketController::class, 'getBandara'])->name('api.bandara'); // API for airport data
-});
+// Route::prefix('tiket')->name('tiket.')->group(function () {
+//     Route::get('/', [PelangganTiketController::class, 'index'])->name('index'); // Browse all tickets
+//     Route::get('/show/{tiket}', [PelangganTiketController::class, 'show'])->name('show'); // Show single ticket detail
+//     Route::get('/pesan/{tiket}', [PelangganTiketController::class, 'pesan'])->name('pesan'); // Form to start booking for a specific ticket (public view)
+//     Route::post('/proses-pesan/{tiket}', [PelangganTiketController::class, 'prosesPersan'])->name('proses-pesan'); // Process public booking
+//     Route::get('/konfirmasi', [PelangganTiketController::class, 'konfirmasi'])->name('konfirmasi'); // Public booking confirmation
+//     Route::get('/api/bandara', [PelangganTiketController::class, 'getBandara'])->name('api.bandara'); // API for airport data
+// });
 
 // ==========================
 // AUTHENTICATION ROUTES
@@ -91,22 +91,22 @@ Route::prefix('pelanggan')->name('pelanggan.')->middleware(['auth', 'pelanggan']
     Route::get('/dashboard', [PelangganDashboardController::class, 'index'])->name('dashboard');
 
     // --- PESANAN ROUTES for Pelanggan ---
-    Route::resource('pesanan', PesananController::class)->except(['edit', 'update', 'destroy']);
+    Route::resource('pesanan', PelangganPesananController::class)->except(['edit', 'update', 'destroy']);
 
-    Route::get('/pesanan/create/{tiket}', [PesananController::class, 'createWithTiket'])->name('pesanan.create.specific');
-    Route::post('/pesanan/{pesanan}/cancel', [PesananController::class, 'cancel'])->name('pesanan.cancel');
+    Route::get('/pesanan/create/{tiket}', [PelangganPesananController::class, 'createWithTiket'])->name('pesanan.create.specific');
+    Route::post('/pesanan/{pesanan}/cancel', [PelangganPesananController::class, 'cancel'])->name('pesanan.cancel');
     // New route for re-attempting payment
-    Route::post('/pesanan/{pesanan}/retry-payment', [PesananController::class, 'retryPayment'])->name('pesanan.retry-payment');
+    Route::post('/pesanan/{pesanan}/retry-payment', [PelangganPesananController::class, 'retryPayment'])->name('pesanan.retry-payment');
 
 
     // --- TIKET Browse ROUTES for Pelanggan ---
     Route::prefix('tiket')->name('tiket.')->group(function () {
-        Route::get('/', [PublicTiketController::class, 'index'])->name('index');
-        Route::get('/show/{tiket}', [PublicTiketController::class, 'show'])->name('show');
-        Route::get('/pesan/{tiket}', [PublicTiketController::class, 'pesan'])->name('pesan');
-        Route::post('/pesan/{tiket}', [PublicTiketController::class, 'prosesPersan'])->name('proses-pesan');
-        Route::get('/konfirmasi', [PublicTiketController::class, 'konfirmasi'])->name('konfirmasi');
-        Route::get('/api/bandara', [PublicTiketController::class, 'getBandara'])->name('api.bandara');
+        Route::get('/', [PelangganTiketController::class, 'index'])->name('index');
+        Route::get('/show/{tiket}', [PelangganTiketController::class, 'show'])->name('show');
+        Route::get('/pesan/{tiket}', [PelangganTiketController::class, 'pesan'])->name('pesan');
+        Route::post('/pesan/{tiket}', [PelangganTiketController::class, 'prosesPersan'])->name('proses-pesan');
+        Route::get('/konfirmasi', [PelangganTiketController::class, 'konfirmasi'])->name('konfirmasi');
+        Route::get('/api/bandara', [PelangganTiketController::class, 'getBandara'])->name('api.bandara');
     });
 
     // Profile Pelanggan

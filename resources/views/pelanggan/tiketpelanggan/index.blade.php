@@ -1,5 +1,4 @@
-{{-- resources/views/tiket/index.blade.php --}}
-@extends('layouts.app')
+@extends('layouts.appp')
 
 @section('title', 'Daftar Tiket Pesawat')
 
@@ -12,7 +11,7 @@
 
     {{-- Filter Section --}}
     <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-        <form method="GET" action="{{ route('tiket.index') }}" class="space-y-4">
+        <form method="GET" action="{{ route('pelanggan.tiket.index') }}" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {{-- Bandara Asal --}}
                 <div>
@@ -153,11 +152,11 @@
                                         Rp {{ number_format($tiket->harga, 0, ',', '.') }}
                                     </div>
                                     <div class="space-y-2">
-                                        <a href="{{ route('tiket.show', $tiket) }}" 
+                                        <a href="{{ route('pelanggan.tiket.show', $tiket) }}" 
                                            class="inline-block bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition duration-200 text-sm">
                                             Detail
                                         </a>
-                                        <a href="{{ route('tiket.pesan', $tiket) }}" 
+                                        <a href="{{ route('pelanggan.tiket.pesan', $tiket) }}" 
                                            class="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200 text-sm ml-2">
                                             Pesan Sekarang
                                         </a>
