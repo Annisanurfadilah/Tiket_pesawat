@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Midtrans\Snap; // Import Midtrans Snap
 use Midtrans\Config; // Import Midtrans Config
+use Illuminate\Support\Facades\Log; // Import Log facade untuk debugging
 
 class PelangganPesananController extends Controller
 {
@@ -17,9 +18,10 @@ class PelangganPesananController extends Controller
     {
         // Set Midtrans Configuration
         Config::$serverKey = config('midtrans.server_key');
-        Config::$isProduction = config('midtrans.is_production');
-        Config::$isSanitized = config('midtrans.is_sanitized');
-        Config::$is3ds = config('midtrans.is_3ds');
+        // Pastikan ini di-cast ke boolean untuk menghindari masalah tipe data
+        Config::$isProduction = (bool)config('midtrans.is_production');
+        Config::$isSanitized = (bool)config('midtrans.is_sanitized');
+        Config::$is3ds = (bool)config('midtrans.is_3ds');
     }
 
     /**
@@ -70,16 +72,15 @@ class PelangganPesananController extends Controller
 
         $totalHarga = $request->jumlah_tiket * $tiket->harga;
 
-        // Check if an existing pending order exists for this user and ticket
-        // This prevents duplicate orders if user refreshes page after payment
+        // Cek jika ada pesanan pending yang sudah ada untuk user dan tiket ini
         $existingPesanan = Pesanan::where('user_id', Auth::id())
                                    ->where('tiket_id', $tiket->id)
-                                   ->whereIn('status_pembayaran', ['pending', 'menunggu_pembayaran'])
+                                   ->whereIn('status_pembayaran', ['pending', 'menunggu_pembayaran', 'failed_midtrans_init', 'challenge'])
                                    ->first();
 
         if ($existingPesanan) {
             return redirect()->route('pelanggan.pesanan.show', $existingPesanan->id)
-                             ->with('info', 'Anda sudah memiliki pesanan pending untuk tiket ini. Silakan lanjutkan pembayaran.');
+                             ->with('info', 'Anda sudah memiliki pesanan yang perlu pembayaran untuk tiket ini. Silakan lanjutkan.');
         }
 
         $pesanan = Pesanan::create([
@@ -87,76 +88,139 @@ class PelangganPesananController extends Controller
             'tiket_id' => $tiket->id,
             'jumlah_tiket' => $request->jumlah_tiket,
             'total_harga' => $totalHarga,
-            // 'kode_booking' is generated in Pesanan model's boot method
             'status_pesanan' => 'menunggu_pembayaran',
             'status_pembayaran' => 'pending',
         ]);
 
-        // Reduce ticket stock after successful order creation
+        // Kurangi stok tiket setelah pesanan berhasil dibuat
         $tiket->decrement('stok', $request->jumlah_tiket);
 
-        // --- Midtrans Integration ---
-        try {
-            $params = array(
-                'transaction_details' => array(
-                    'order_id' => $pesanan->kode_booking, // Use kode_booking as Midtrans order ID
-                    'gross_amount' => $pesanan->total_harga,
-                ),
-                'customer_details' => array(
-                    'first_name' => Auth::user()->nama,
-                    'email' => Auth::user()->email,
-                    'phone' => Auth::user()->nomor_telepon,
-                    // 'address' => Auth::user()->alamat, // Add if needed
-                ),
-                'item_details' => [
-                    [
-                        'id' => $tiket->id,
-                        'price' => $tiket->harga,
-                        'quantity' => $pesanan->jumlah_tiket,
-                        'name' => $tiket->maskapai . ' - ' . $tiket->bandara_asal . ' to ' . $tiket->bandara_tujuan,
-                    ]
-                ],
-                'callbacks' => [
-                    'finish' => route('midtrans.finish'),
-                    'unfinish' => route('midtrans.unfinish'),
-                    'error' => route('midtrans.error'),
-                ]
-            );
-
-            $snapToken = Snap::getSnapToken($params);
-            $pesanan->update([
-                'url_pembayaran_midtrans' => 'https://app.sandbox.midtrans.com/snap/v1/pay/' . $snapToken, // Snap URL + Snap Token
-                'midtrans_transaction_id' => null, // Will be filled by callback
-                'midtrans_transaction_status' => 'pending', // Initial Midtrans status
-            ]);
-
-            return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('success', 'Pesanan berhasil dibuat. Lanjutkan pembayaran.');
-
-        } catch (\Exception $e) {
-            // If Midtrans Snap token generation fails, revert stock and set order status to failed
-            $tiket->increment('stok', $request->jumlah_tiket); // Revert stock
-            $pesanan->update([
-                'status_pesanan' => 'gagal',
-                'status_pembayaran' => 'failed_midtrans_init',
-            ]);
-            return redirect()->back()->with('error', 'Gagal membuat transaksi pembayaran: ' . $e->getMessage());
-        }
+        return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('success', 'Pesanan berhasil dibuat. Silakan lanjutkan pembayaran.');
     }
 
     /**
      * Display the specified resource.
+     * Generates a new Snap token if necessary, but doesn't auto-popup.
      */
     public function show(Pesanan $pesanan)
     {
         if ($pesanan->user_id !== Auth::id()) {
-            abort(403); // Forbidden
+            abort(403); // Forbidden jika bukan pemilik pesanan
         }
-        return view('pelanggan.pesanan.show', compact('pesanan'));
+
+        $snapToken = null;
+
+        // Kondisi untuk generate token:
+        // 1. Pesanan masih pending/membutuhkan pembayaran (isPendingPayment())
+        // 2. Belum ada URL pembayaran Midtrans ATAU ada URL tapi transaksinya sudah expired/failed (untuk retry)
+        //    Asumsi: Jika url_pembayaran_midtrans ada, kita bisa cek statusnya dari Midtrans_transaction_status.
+        //    Untuk kesederhanaan, kita akan generate ulang jika url_pembayaran_midtrans kosong atau
+        //    jika status Midtransnya adalah 'expire'/'cancel'/'deny' dan kita ingin user bisa coba lagi.
+
+        $shouldGenerateNewToken = false;
+
+        // Check if the order is in a state that requires payment
+        if ($pesanan->isPendingPayment()) {
+            if (empty($pesanan->url_pembayaran_midtrans) ||
+                ($pesanan->midtrans_transaction_status === 'expire' ||
+                 $pesanan->midtrans_transaction_status === 'cancel' ||
+                 $pesanan->midtrans_transaction_status === 'deny' ||
+                 $pesanan->midtrans_transaction_status === 'failed'))
+            {
+                $shouldGenerateNewToken = true;
+            } else {
+                // If there's an existing URL and it's still "pending" (not expired/failed/canceled)
+                // then we can extract the token from the existing URL.
+                $urlParts = explode('/', $pesanan->url_pembayaran_midtrans);
+                $snapToken = end($urlParts);
+            }
+        }
+
+        if ($shouldGenerateNewToken) {
+            try {
+                if (!$pesanan->tiket) {
+                    throw new \Exception('Tiket untuk pesanan ini tidak ditemukan.');
+                }
+
+                $params = [
+                    'transaction_details' => [
+                        'order_id' => $pesanan->kode_booking,
+                        'gross_amount' => $pesanan->total_harga,
+                    ],
+                    'customer_details' => [
+                        'first_name' => Auth::user()->nama,
+                        'email' => Auth::user()->email,
+                        'phone' => Auth::user()->nomor_telepon,
+                    ],
+                    'item_details' => [
+                        [
+                            'id' => $pesanan->tiket->id,
+                            'price' => $pesanan->tiket->harga,
+                            'quantity' => $pesanan->jumlah_tiket,
+                            'name' => $pesanan->tiket->maskapai . ' - ' . $pesanan->tiket->bandara_asal . ' to ' . $pesanan->tiket->bandara_tujuan,
+                        ]
+                    ],
+                    'callbacks' => [
+                        'finish' => route('midtrans.finish'),
+                        'unfinish' => route('midtrans.unfinish'),
+                        'error' => route('midtrans.error'),
+                    ]
+                ];
+
+                $snapToken = Snap::getSnapToken($params);
+
+                // Selalu simpan URL Snap terbaru ke database
+                $pesanan->update([
+                    'url_pembayaran_midtrans' => 'https://app.sandbox.midtrans.com/snap/v1/pay/' . $snapToken,
+                    'midtrans_transaction_status' => 'pending', // Reset status Midtrans saat token baru digenerate
+                ]);
+
+                Log::info('Snap Token generated and saved for order: ' . $pesanan->kode_booking);
+
+            } catch (\Exception $e) {
+                Log::error('Midtrans Snap generation failed for order ' . $pesanan->id . ': ' . $e->getMessage());
+                $pesanan->update([
+                    'status_pesanan' => 'gagal',
+                    'status_pembayaran' => 'failed_midtrans_init',
+                ]);
+                return redirect()->back()->with('error', 'Gagal memuat pembayaran: ' . $e->getMessage());
+            }
+        }
+
+        return view('pelanggan.pesanan.show', compact('pesanan', 'snapToken'));
+    }
+
+    /**
+     * Redirects to the show page to trigger payment retry.
+     */
+    public function retryPayment(Pesanan $pesanan)
+    {
+        if ($pesanan->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        // Only allow retry if order is in a state that allows it
+        if (!($pesanan->isPendingPayment() ||
+              $pesanan->status_pembayaran === 'failed' ||
+              $pesanan->status_pembayaran === 'expired' ||
+              $pesanan->status_pembayaran === 'cancelled' ||
+              $pesanan->status_pembayaran === 'challenge' ||
+              $pesanan->status_pesanan === 'gagal' ||
+              $pesanan->status_pembayaran === 'failed_midtrans_init'))
+        {
+             return redirect()->back()->with('error', 'Pesanan tidak dalam status yang dapat dicoba ulang pembayarannya.');
+        }
+
+        // Force regeneration of new token by clearing the old URL (optional, show() handles it now)
+        // If you want to force a new token explicitly, you can set url_pembayaran_midtrans to null here
+        // $pesanan->update(['url_pembayaran_midtrans' => null]);
+
+        return redirect()->route('pelanggan.pesanan.show', $pesanan->id)
+                         ->with('info', 'Mencoba memuat ulang pembayaran. Silakan klik "Bayar Sekarang".');
     }
 
     /**
      * Show the form for editing the specified resource (uncommon for customer to edit order directly).
-     * This is usually for admin. If customer can edit, define logic here.
      */
     public function edit(Pesanan $pesanan)
     {
@@ -165,7 +229,6 @@ class PelangganPesananController extends Controller
 
     /**
      * Update the specified resource in storage (uncommon for customer to update order directly).
-     * This is usually for admin. If customer can update, define logic here.
      */
     public function update(Request $request, Pesanan $pesanan)
     {
@@ -174,7 +237,6 @@ class PelangganPesananController extends Controller
 
     /**
      * Remove the specified resource from storage (uncommon for customer to delete order).
-     * Customers typically cancel, not delete.
      */
     public function destroy(Pesanan $pesanan)
     {
@@ -190,7 +252,6 @@ class PelangganPesananController extends Controller
             abort(403);
         }
 
-        // Only allow cancellation if order is in a cancellable state (e.g., 'menunggu_pembayaran', 'pending')
         if ($pesanan->status_pesanan === 'menunggu_pembayaran' || $pesanan->status_pembayaran === 'pending') {
             $pesanan->update([
                 'status_pesanan' => 'dibatalkan',
@@ -198,69 +259,15 @@ class PelangganPesananController extends Controller
             ]);
 
             // Return stock to ticket if necessary
+            // Pastikan ini tidak duplikasi dengan logika di MidtransCallbackController
             if ($pesanan->tiket) {
                 $pesanan->tiket->increment('stok', $pesanan->jumlah_tiket);
+                Log::info('Stock incremented due to manual cancellation for order: ' . $pesanan->kode_booking);
             }
 
             return redirect()->route('pelanggan.pesanan.index')->with('success', 'Pesanan berhasil dibatalkan.');
         }
 
         return redirect()->back()->with('error', 'Pesanan tidak dapat dibatalkan pada status ini.');
-    }
-
-    /**
-     * Re-attempt payment for a pending order.
-     */
-    public function retryPayment(Pesanan $pesanan)
-    {
-        if ($pesanan->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        // Only allow re-attempt if the order is still pending payment
-        if ($pesanan->status_pembayaran === 'pending' || $pesanan->status_pembayaran === 'failed_midtrans_init') {
-            try {
-                $params = array(
-                    'transaction_details' => array(
-                        'order_id' => $pesanan->kode_booking,
-                        'gross_amount' => $pesanan->total_harga,
-                    ),
-                    'customer_details' => array(
-                        'first_name' => Auth::user()->nama,
-                        'email' => Auth::user()->email,
-                        'phone' => Auth::user()->nomor_telepon,
-                    ),
-                    'item_details' => [
-                        [
-                            'id' => $pesanan->tiket->id,
-                            'price' => $pesanan->tiket->harga,
-                            'quantity' => $pesanan->jumlah_tiket,
-                            'name' => $pesanan->tiket->maskapai . ' - ' . $pesanan->tiket->bandara_asal . ' to ' . $pesanan->tiket->bandara_tujuan,
-                        ]
-                    ],
-                    'callbacks' => [
-                        'finish' => route('midtrans.finish'),
-                        'unfinish' => route('midtrans.unfinish'),
-                        'error' => route('midtrans.error'),
-                    ]
-                );
-
-                $snapToken = Snap::getSnapToken($params);
-                $pesanan->update([
-                    'url_pembayaran_midtrans' => 'https://app.sandbox.midtrans.com/snap/v1/pay/' . $snapToken,
-                    'midtrans_transaction_id' => null, // Reset if new transaction initiated
-                    'midtrans_transaction_status' => 'pending',
-                    'status_pembayaran' => 'pending', // Set status back to pending
-                    'status_pesanan' => 'menunggu_pembayaran', // Set status back
-                ]);
-
-                return redirect()->route('pelanggan.pesanan.show', $pesanan->id)->with('success', 'Silakan lanjutkan pembayaran Anda.');
-
-            } catch (\Exception $e) {
-                return redirect()->back()->with('error', 'Gagal memuat ulang pembayaran: ' . $e->getMessage());
-            }
-        }
-
-        return redirect()->back()->with('error', 'Pesanan tidak dalam status yang dapat dicoba ulang pembayarannya.');
     }
 }

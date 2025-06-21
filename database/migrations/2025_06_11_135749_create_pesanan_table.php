@@ -12,12 +12,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Pelanggan yang membuat pesanan
 
-            // Detail Tiket (idealnya diambil dari tiket_id, tapi bisa disimpan sebagai snapshot)
-            // Jika ingin menyimpan snapshot:
-            // $table->string('rute');
-            // $table->decimal('harga', 10, 2); // Harga per tiket saat pemesanan
-            // $table->string('maskapai');
-
             // Foreign key ke tabel tikets
             $table->foreignId('tiket_id')->nullable()->constrained()->onDelete('set null'); // nullable jika tiket bisa dihapus
             $table->integer('jumlah_tiket'); // Jumlah tiket yang dipesan

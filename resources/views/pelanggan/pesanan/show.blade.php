@@ -1,5 +1,5 @@
 {{-- resources/views/pelanggan/pesanan/show.blade.php --}}
-@extends('layouts.appp') {{-- Pastikan layout ini benar --}}
+@extends('layouts.appp')
 
 @section('title', 'Detail Pesanan #' . $pesanan->kode_booking)
 
@@ -71,16 +71,12 @@
                 <i class="fas fa-arrow-left mr-2"></i> Kembali ke Riwayat Pesanan
             </a>
 
-            @if($pesanan->status_pembayaran === 'pending' || $pesanan->status_pesanan === 'menunggu_pembayaran')
-                @if($pesanan->url_pembayaran_midtrans)
-                    <a href="{{ $pesanan->url_pembayaran_midtrans }}" target="_blank" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors duration-200">
-                        <i class="fas fa-credit-card mr-2"></i> Lanjutkan Pembayaran
-                    </a>
-                @else
-                    <button class="inline-flex items-center px-6 py-3 bg-gray-400 text-white rounded-md font-medium cursor-not-allowed">
-                        <i class="fas fa-hourglass-half mr-2"></i> Menunggu URL Pembayaran
-                    </button>
-                @endif
+            @if($pesanan->isPendingPayment() || $pesanan->status_pembayaran === 'failed_midtrans_init' || $pesanan->status_pembayaran === 'challenge')
+                {{-- Tombol untuk menampilkan pop-up pembayaran. ID 'pay-button' penting untuk JS. --}}
+                <button id="pay-button"
+                        class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors duration-200">
+                    <i class="fas fa-credit-card mr-2"></i> Bayar Sekarang
+                </button>
                 <form action="{{ route('pelanggan.pesanan.cancel', $pesanan->id) }}" method="POST" onsubmit="return confirm('Anda yakin ingin membatalkan pesanan ini?');" class="inline-block">
                     @csrf
                     <button type="submit" class="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-md font-medium hover:bg-red-700 transition-colors duration-200">
@@ -91,7 +87,8 @@
                 <span class="inline-flex items-center px-6 py-3 bg-green-500 text-white rounded-md font-medium">
                     <i class="fas fa-check-circle mr-2"></i> Pesanan Selesai
                 </span>
-            @elseif($pesanan->status_pembayaran === 'failed' || $pesanan->status_pembayaran === 'expired' || $pesanan->status_pembayaran === 'cancelled' || $pesanan->status_pembayaran === 'challenge' || $pesanan->status_pesanan === 'gagal')
+            @elseif($pesanan->status_pembayaran === 'failed' || $pesanan->status_pembayaran === 'expired' || $pesanan->status_pembayaran === 'cancelled' || $pesanan->status_pesanan === 'gagal')
+                 {{-- Tombol "Coba Lagi Pembayaran" akan me-redirect ke show, yang akan memicu pop-up --}}
                  <form action="{{ route('pelanggan.pesanan.retry-payment', $pesanan->id) }}" method="POST" class="inline-block">
                     @csrf
                     <button type="submit" class="inline-flex items-center px-6 py-3 bg-yellow-600 text-white rounded-md font-medium hover:bg-yellow-700 transition-colors duration-200">
@@ -102,4 +99,62 @@
         </div>
     </div>
 </div>
+
+{{-- Pastikan ini berada di bagian akhir body atau di head, sebelum script utama Anda --}}
+<script type="text/javascript"
+        src="https://app.sandbox.midtrans.com/snap/snap.js"
+        data-client-key="{{ config('midtrans.client_key') }}"></script>
+
+<script type="text/javascript">
+    const payButton = document.getElementById('pay-button');
+
+    @if ($snapToken)
+        // Fungsi untuk memicu pop-up Midtrans
+        function showMidtransPopup() {
+            snap.pay('{{ $snapToken }}', {
+                onSuccess: function(result) {
+                    alert("Pembayaran Berhasil!");
+                    console.log(result);
+                    window.location.href = "{{ route('pelanggan.pesanan.index') }}"; // Redirect ke halaman finish Anda
+                },
+                onPending: function(result) {
+                    alert("Pembayaran Pending!");
+                    console.log(result);
+                    // Anda bisa memilih untuk tetap di halaman ini atau refresh
+                    // window.location.reload();
+                },
+                onError: function(result) {
+                    alert("Pembayaran Gagal!");
+                    console.log(result);
+                    window.location.href = "{{ route('midtrans.error') }}"; // Redirect ke halaman error Anda
+                },
+                onClose: function() {
+                    // alert('Anda menutup pop-up tanpa menyelesaikan pembayaran.');
+                    // Opsional: refresh halaman untuk memeriksa status pembayaran terbaru
+                    // window.location.reload();
+                }
+            });
+        }
+
+        // HAPUS setTimeout() untuk mencegah auto-popup.
+        // Sekarang pop-up hanya akan muncul saat tombol diklik.
+
+        // Tambahkan event listener ke tombol "Bayar Sekarang" jika tombol itu ada
+        if (payButton) {
+            payButton.addEventListener('click', showMidtransPopup);
+        }
+    @else
+        // Jika tidak ada snapToken (misal sudah dibayar atau ada error fatal),
+        // bisa sembunyikan tombol atau beri alert info.
+        if (payButton) {
+            // Jika tombol 'pay-button' muncul tapi tidak ada snapToken,
+            // ini berarti pesanan sudah tidak lagi pending atau ada masalah.
+            // Anda bisa menyembunyikan tombol atau mengubah teksnya.
+            // payButton.style.display = 'none'; // Sembunyikan tombol
+            payButton.addEventListener('click', function() {
+                alert('Pembayaran tidak diperlukan atau tidak dapat dilanjutkan. Silakan cek status pesanan Anda.');
+            });
+        }
+    @endif
+</script>
 @endsection

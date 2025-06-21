@@ -12,6 +12,9 @@ class VerifyCsrfToken extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        //
+         '/midtrans-callback',
+         '/midtrans-finish',
+         '/midtrans-unfinish',
+         '/midtrans-error',
     ];
 }

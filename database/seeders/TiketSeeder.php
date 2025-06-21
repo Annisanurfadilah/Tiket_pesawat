@@ -14,7 +14,7 @@ class TiketSeeder extends Seeder
             'bandara_tujuan' => 'Ngurah Rai',
             'tanggal_keberangkatan' => now()->addDays(10),
             'jam_keberangkatan' => '14:00',
-            'harga' => 1500000,
+            'harga' => 1,
             'stok' => 10,
             'status' => 'tersedia',
             'gambar' => 'garuda.png'
