@@ -8,8 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #4f7df9;
-      --secondary: #928bfa;
+      --primary:rgb(132, 188, 233);
+      --secondary:rgb(46, 132, 167);
       --text: #333;
       --background: #f9fafe;
     }
@@ -22,7 +22,7 @@
 
     body {
       font-family: 'Poppins', sans-serif;
-      background: linear-gradient(to right top, #2e3a59, #3f4d7f, #5661a5, #7276cb, #928bfa);
+      background: linear-gradient(to right top,rgb(149, 168, 216), #3f4d7f,rgb(102, 153, 230),rgb(96, 142, 196),rgb(164, 162, 190));
       color: var(--text);
       overflow-x: hidden;
     }
@@ -90,12 +90,12 @@
       font-size: 1.1rem;
       text-decoration: none;
       transition: all 0.3s;
-      box-shadow: 0 4px 15px rgba(79, 125, 249, 0.4);
+      box-shadow: 0 4px 15px rgba(47, 141, 218, 0.4);
     }
 
     .cta-button:hover {
       transform: translateY(-3px);
-      box-shadow: 0 8px 30px rgba(79, 125, 249, 0.6);
+      box-shadow: 0 8px 30px rgba(106, 166, 206, 0.6);
     }
 
     .features {
