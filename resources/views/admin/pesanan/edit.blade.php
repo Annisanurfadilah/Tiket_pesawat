@@ -1,61 +1,60 @@
-{{-- resources/views/admin/pesanan/edit.blade.php --}}
-@extends('layouts.admin') {{-- Sesuaikan dengan layout admin Anda --}}
+@extends('layouts.app') {{-- Ganti dengan layout kamu jika berbeda --}}
 
-@section('title', 'Edit Status Pesanan')
+@section('title', 'Detail Pesanan')
 
 @section('content')
-<div class="container-fluid">
-    <h1 class="h3 mb-4 text-gray-800">Edit Status Pesanan #{{ $pesanan->kode_booking }}</h1>
-
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Form Edit Status</h6>
+<div class="min-h-screen bg-cover bg-center flex items-center justify-center px-4 py-10" style="background-image: url('{{ asset('images/bg-airline.png') }}');">
+    <div class="bg-white/90 backdrop-blur-md rounded-xl shadow-lg p-8 w-full max-w-4xl">
+        <div class="flex justify-between items-start mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800">Detail Pesanan <span class="text-blue-600">#{{ $pesanan->kode_booking }}</span></h2>
+            @if($pesanan->status_pembayaran === 'failed')
+                <span class="text-sm bg-red-100 text-red-600 px-3 py-1 rounded-full font-semibold">GAGAL</span>
+            @endif
         </div>
-        <div class="card-body">
-            <form action="{{ route('admin.pesanan.update', $pesanan->id) }}" method="POST">
-                @csrf
-                @method('PUT')
 
-                <div class="mb-3">
-                    <label for="status_pesanan" class="form-label">Status Pesanan</label>
-                    <select class="form-select @error('status_pesanan') is-invalid @enderror" id="status_pesanan" name="status_pesanan" required>
-                        <option value="menunggu_pembayaran" {{ old('status_pesanan', $pesanan->status_pesanan) == 'menunggu_pembayaran' ? 'selected' : '' }}>Menunggu Pembayaran</option>
-                        <option value="diproses" {{ old('status_pesanan', $pesanan->status_pesanan) == 'diproses' ? 'selected' : '' }}>Diproses</option>
-                        <option value="selesai" {{ old('status_pesanan', $pesanan->status_pesanan) == 'selesai' ? 'selected' : '' }}>Selesai</option>
-                        <option value="dibatalkan" {{ old('status_pesanan', $pesanan->status_pesanan) == 'dibatalkan' ? 'selected' : '' }}>Dibatalkan</option>
-                    </select>
-                    @error('status_pesanan')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
+        <div class="grid md:grid-cols-2 gap-6 text-sm text-gray-700">
+            <div>
+                <h4 class="font-semibold text-gray-800 mb-2">Informasi Pesanan</h4>
+                <p><strong>ID Pesanan:</strong> {{ $pesanan->id }}</p>
+                <p><strong>Tanggal Pesan:</strong> {{ $pesanan->created_at->format('d F Y, H:i') }}</p>
+                <p><strong>Jumlah Tiket:</strong> {{ $pesanan->jumlah_tiket }}</p>
+                <p><strong>Total Harga:</strong> <span class="text-green-600 font-bold">Rp {{ number_format($pesanan->total_harga) }}</span></p>
+                <p><strong>Status Pembayaran:</strong> {{ $pesanan->status_pembayaran }}</p>
+                <p><strong>Midtrans Status:</strong> {{ $pesanan->midtrans_status ?? 'Pending' }}</p>
+            </div>
 
-                <div class="mb-3">
-                    <label for="status_pembayaran" class="form-label">Status Pembayaran</label>
-                    <select class="form-select @error('status_pembayaran') is-invalid @enderror" id="status_pembayaran" name="status_pembayaran" required>
-                        <option value="pending" {{ old('status_pembayaran', $pesanan->status_pembayaran) == 'pending' ? 'selected' : '' }}>Pending</option>
-                        <option value="paid" {{ old('status_pembayaran', $pesanan->status_pembayaran) == 'paid' ? 'selected' : '' }}>Dibayar</option>
-                        <option value="failed" {{ old('status_pembayaran', $pesanan->status_pembayaran) == 'failed' ? 'selected' : '' }}>Gagal</option>
-                        <option value="refunded" {{ old('status_pembayaran', $pesanan->status_pembayaran) == 'refunded' ? 'selected' : '' }}>Refunded</option>
-                    </select>
-                    @error('status_pembayaran')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
+            <div>
+                <h4 class="font-semibold text-gray-800 mb-2">Detail Tiket</h4>
+                <p><strong>Maskapai:</strong> {{ $pesanan->maskapai }}</p>
+                <p><strong>Rute:</strong> {{ $pesanan->rute }}</p>
+                <p><strong>Tanggal Berangkat:</strong> {{ $pesanan->tanggal_berangkat->format('d F Y') }}</p>
+                <p><strong>Jam Berangkat:</strong> {{ $pesanan->jam_berangkat }}</p>
+                <p><strong>Harga Tiket Satuan:</strong> Rp {{ number_format($pesanan->harga_satuan) }}</p>
+            </div>
+        </div>
 
-                {{-- Opsi untuk menambahkan catatan admin jika perlu --}}
-                {{--
-                <div class="mb-3">
-                    <label for="catatan_admin" class="form-label">Catatan Admin (Opsional)</label>
-                    <textarea class="form-control @error('catatan_admin') is-invalid @enderror" id="catatan_admin" name="catatan_admin" rows="3">{{ old('catatan_admin', $pesanan->catatan_admin ?? '') }}</textarea>
-                    @error('catatan_admin')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-                --}}
+        <hr class="my-6">
 
-                <button type="submit" class="btn btn-primary">Update Status</button>
-                <a href="{{ route('admin.pesanan.show', $pesanan->id) }}" class="btn btn-secondary">Batal</a>
-            </form>
+        <div class="flex justify-between flex-wrap gap-3">
+            <a href="{{ route('pelanggan.pesanan.index') }}" class="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-100">
+                &larr; Kembali ke Riwayat Pesanan
+            </a>
+
+            @if($pesanan->status_pembayaran === 'pending')
+                <form action="{{ route('pelanggan.pesanan.bayar', $pesanan->id) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Bayar Sekarang
+                    </button>
+                </form>
+                <form action="{{ route('pelanggan.pesanan.batal', $pesanan->id) }}" method="POST">
+                    @csrf
+                    @method('PUT')
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                        Batalkan Pesanan
+                    </button>
+                </form>
+            @endif
         </div>
     </div>
 </div>

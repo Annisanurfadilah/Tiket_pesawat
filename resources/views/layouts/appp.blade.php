@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Dashboard') - {{ config('app.name', 'Laravel') }}</title>
+    <title>@yield('title', 'Dashboard') - {{ config('app.name', 'SemestaAirline') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -22,7 +22,7 @@
     
     @stack('styles')
 </head>
-<body class="font-sans antialiased bg-gray-50">
+<body class="font-sans antialiased bg-gray-50 bg-cover bg-center" style="background-image: url('https://i.pinimg.com/736x/bc/70/19/bc701962a87056f2928e7ca53162aa33.jpg');">
     <div class="min-h-screen">
         <!-- Navigation -->
         <nav class="bg-white shadow-lg border-b border-gray-200">
@@ -32,8 +32,8 @@
                     <div class="flex items-center">
                         <div class="flex-shrink-0 flex items-center">
                             <a href="{{ route('pelanggan.dashboard') }}" class="text-2xl font-bold text-blue-600">
-                                <i class="fas fa-store mr-2"></i>
-                                {{ config('app.name', 'Laravel') }}
+                                <i class="fas fa-plane mr-2"></i>
+                                {{ config('app.name', 'SemestaAirline') }}
                             </a>
                         </div>
                         
@@ -117,7 +117,7 @@
             <div class="sm:hidden" x-show="open" x-data="{ open: false }">
                 <div class="pt-2 pb-3 space-y-1 bg-gray-50 border-t border-gray-200">
                     <a href="{{ route('pelanggan.dashboard') }}" class="flex items-center pl-3 pr-4 py-2 border-l-4 {{ request()->routeIs('pelanggan.dashboard') ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-transparent text-gray-600' }} text-base font-medium hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 transition duration-150 ease-in-out">
-                        <i class="fas fa-tachometer-alt mr-3"></i>
+                        <i class="fas fa-plane-alt mr-3"></i>
                         Dashboard
                     </a>
                     <a href="{{ route('pelanggan.pesanan.index') }}" class="flex items-center pl-3 pr-4 py-2 border-l-4 {{ request()->routeIs('pelanggan.pesanan.*') ? 'border-blue-500 text-blue-700 bg-blue-50' : 'border-transparent text-gray-600' }} text-base font-medium hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 transition duration-150 ease-in-out">
@@ -197,7 +197,7 @@
                     <div class="col-span-2">
                         <div class="flex items-center mb-4">
                             <i class="fas fa-store text-blue-600 text-2xl mr-2"></i>
-                            <span class="text-xl font-bold text-gray-900">{{ config('app.name', 'Laravel') }}</span>
+                            <span class="text-xl font-bold text-gray-900">{{ config('app.name', 'SemestaAirline') }}</span>
                         </div>
                         <p class="text-gray-600 text-sm">
                             Platform terpercaya untuk semua kebutuhan pesanan Anda. 
@@ -226,7 +226,7 @@
                 
                 <div class="border-t border-gray-200 mt-8 pt-8">
                     <p class="text-center text-gray-500 text-sm">
-                        &copy; 2024 {{ config('app.name', 'Laravel') }}. All rights reserved.
+                        &copy; 2025 {{ config('app.name', 'SemestaAirline') }}. All rights reserved.
                     </p>
                 </div>
             </div>
