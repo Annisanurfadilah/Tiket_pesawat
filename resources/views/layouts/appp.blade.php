@@ -61,7 +61,6 @@
                             <span class="sr-only">Notifications</span>
                         </button>
 
-                        <!-- Profile dropdown -->
                         <div class="relative ml-3" x-data="{ open: false }">
                             <div>
                                 <button @click="open = ! open" class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
